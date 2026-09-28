@@ -30,6 +30,17 @@ Patches in `patches/common/` are applied to all builds. Device-specific patches 
 | `hide-cursor.py` | Unconditionally hide mouse cursor |
 | `no-mute-secondary.py` | Remove auto-mute when PPSSPP_ID > 1 |
 
+### PowerVR build: display rotation (MagicX Mini Zero 28)
+
+The MagicX Mini Zero 28 has the Brick/TSP's A133P and GE8300, and its MOSS firmware ships the Smart Pro's SDL2, so it runs `PPSSPPSDL_TrimUI` (spruceOS's `Zero28.cfg` uses it with `DISPLAY_ROTATION=90`). The PVR build now also applies the A30's rotation patch; it does nothing unless `DISPLAY_ROTATION` is set.
+
+| Patch | What it does |
+|-------|-------------|
+| `a30/display-rotation.py` | Also applied to the PVR build: rotates PPSSPP's output by `DISPLAY_ROTATION` |
+| `zero28/rotated-backbuffer-rects.py` | Maps backbuffer viewport/scissor rects correctly for every rotation. `display-rotation.py` swaps x/y, which only matches `DISPLAY_ROTATION=270` (the A30); at 90 it clipped PPSSPP's menus to the middle of the screen |
+
+Written by Claude (Anthropic's Claude Opus 5.5) in Claude Code, building on the A30 rotation patch here; tested on a Zero 28 by [arniebradfo](https://github.com/arniebradfo).
+
 ### Assets path
 
 Assets (fonts, UI images, flash0 firmware files) are found **relative to the binary** at `<binary_dir>/assets/`. This is not patched — it uses PPSSPP's built-in exe-relative discovery via `/proc/self/exe`. No changes needed as long as the `assets/` folder sits next to the binary.
