@@ -44,6 +44,15 @@ static void build_main_menu(EmuOvl* ovl) {
 		n++;
 	}
 
+	// $EMU_OVERLAY_HOST_MENU names an entry that hands over to the emulator's
+	// own menu (e.g. "PPSSPP Menu"), for what the overlay doesn't cover.
+	const char* host_menu = getenv("EMU_OVERLAY_HOST_MENU");
+	if (host_menu && host_menu[0]) {
+		snprintf(ovl->main_items[n].label, sizeof(ovl->main_items[n].label), "%s", host_menu);
+		ovl->main_items[n].type = EMU_OVL_MAIN_HOST_MENU;
+		n++;
+	}
+
 	snprintf(ovl->main_items[n].label, sizeof(ovl->main_items[n].label), "Quit");
 	ovl->main_items[n].type = EMU_OVL_MAIN_QUIT;
 	n++;
@@ -319,6 +328,10 @@ bool emu_ovl_update(EmuOvl* ovl, EmuOvlInput* input) {
 				break;
 			case EMU_OVL_MAIN_QUIT:
 				ovl->action = EMU_OVL_ACTION_QUIT;
+				ovl->state = EMU_OVL_STATE_CLOSED;
+				return false;
+			case EMU_OVL_MAIN_HOST_MENU:
+				ovl->action = EMU_OVL_ACTION_HOST_MENU;
 				ovl->state = EMU_OVL_STATE_CLOSED;
 				return false;
 			}

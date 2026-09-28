@@ -15,5 +15,13 @@ bool Overlay_CheckMenuButton();
 // Returns true if the user chose to quit the emulator.
 bool Overlay_RunMenu(SDL_Window *window);
 
+// Raw joystick button the overlay opens on ($EMU_PAD menu=, default 8), or -1
+// when the overlay isn't built in.
+int Overlay_MenuButton();
+
+// Whether menu button events belong to the overlay right now (in-game) rather
+// than to PPSSPP.
+bool Overlay_OwnsMenuButton();
+
 // Cleanup overlay resources.
 void Overlay_Shutdown();

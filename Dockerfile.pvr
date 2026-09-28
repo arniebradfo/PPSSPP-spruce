@@ -49,6 +49,7 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)\n\
 COPY build-pvr.sh /build-pvr.sh
 RUN chmod +x /build-pvr.sh
 COPY patches/ /patches/
+COPY overlay/ /overlay/
 
 WORKDIR /build
 ENTRYPOINT ["/build-pvr.sh"]

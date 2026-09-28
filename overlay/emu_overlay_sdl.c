@@ -61,6 +61,49 @@ static int s_scale = 2;
 static int s_screenW = 0;
 static int s_screenH = 0;
 
+// Display rotation in degrees ($EMU_OVERLAY_ROTATE: 0, 90, 180, 270), for
+// panels mounted rotated from how the game is shown (MagicX Mini Zero 28: a
+// 480x640 panel held landscape, DISPLAY_ROTATION=90). The overlay composes in
+// the logical s_screenW x s_screenH space; only reading the backbuffer and the
+// final quad deal with the physical orientation. The mapping matches PPSSPP's
+// ortho * rot_matrix (patches/zero28/rotated-backbuffer-rects.py).
+static int s_rotate = 0;
+
+static bool rotated_sideways(void) {
+	return s_rotate == 90 || s_rotate == 270;
+}
+static int phys_w(void) {
+	return rotated_sideways() ? s_screenH : s_screenW;
+}
+static int phys_h(void) {
+	return rotated_sideways() ? s_screenW : s_screenH;
+}
+
+// Logical pixel (top-left origin) -> physical GL pixel (bottom-left origin).
+static void logical_to_gl_pixel(int lx, int ly, int* gx, int* gy) {
+	switch (s_rotate) {
+	case 90: *gx = s_screenH - 1 - ly; *gy = s_screenW - 1 - lx; break;
+	case 180: *gx = s_screenW - 1 - lx; *gy = ly; break;
+	case 270: *gx = ly; *gy = lx; break;
+	default: *gx = lx; *gy = s_screenH - 1 - ly; break;
+	}
+}
+
+// Physical NDC position -> logical texture coordinate (v = 0 at the top).
+static void ndc_to_logical_uv(float px, float py, float* u, float* v) {
+	float gx = (px + 1.0f) * 0.5f * (float)phys_w();
+	float gy = (py + 1.0f) * 0.5f * (float)phys_h();
+	float lx, ly;
+	switch (s_rotate) {
+	case 90: lx = (float)s_screenW - gy; ly = (float)s_screenH - gx; break;
+	case 180: lx = (float)s_screenW - gx; ly = gy; break;
+	case 270: lx = gy; ly = gx; break;
+	default: lx = gx; ly = (float)s_screenH - gy; break;
+	}
+	*u = lx / (float)s_screenW;
+	*v = ly / (float)s_screenH;
+}
+
 static TTF_Font* s_fonts[3] = {NULL, NULL, NULL}; // LARGE, SMALL, TINY
 
 static SDL_Surface* s_renderSurface = NULL;	 // ARGB8888 compositing surface
@@ -178,9 +221,14 @@ static int ovl_sdl_init(int screen_w, int screen_h) {
 	s_screenW = screen_w;
 	s_screenH = screen_h;
 
-	// Scale factor: match NextUI's FIXED_SCALE
-	// Brick (1024x768) = 3x, Smart Pro / TG5050 (1280x720) = 2x
-	if (screen_w <= 1024)
+	const char* rot = getenv("EMU_OVERLAY_ROTATE");
+	s_rotate = rot ? atoi(rot) : 0;
+	if (s_rotate != 90 && s_rotate != 180 && s_rotate != 270)
+		s_rotate = 0;
+
+	// Scale factor: match NextUI's FIXED_SCALE. Only the Brick's 1024x768
+	// display uses 3x; the Smart Pro, TG5050 and 640x480 devices use 2x.
+	if (screen_w == 1024 && screen_h == 768)
 		s_scale = 3;
 	else
 		s_scale = 2;
@@ -380,29 +428,33 @@ static void ovl_sdl_capture_frame(void) {
 
 	int w = s_screenW;
 	int h = s_screenH;
+	int pw = phys_w();
+	int ph = phys_h();
 
-	// Temporary buffer for glReadPixels (RGBA, bottom-up)
-	size_t row_bytes = (size_t)w * 4;
-	uint8_t* gl_pixels = (uint8_t*)malloc(row_bytes * (size_t)h);
+	// Temporary buffer for glReadPixels (RGBA, bottom-up, physical orientation)
+	size_t row_bytes = (size_t)pw * 4;
+	uint8_t* gl_pixels = (uint8_t*)malloc(row_bytes * (size_t)ph);
 	if (!gl_pixels)
 		return;
 
-	glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, gl_pixels);
+	glReadPixels(0, 0, pw, ph, GL_RGBA, GL_UNSIGNED_BYTE, gl_pixels);
 
-	// Copy into capture surface, flipping vertically and converting RGBA -> ARGB
+	// Copy into the logical capture surface, undoing the GL flip and any
+	// display rotation, and converting RGBA -> ARGB
 	SDL_LockSurface(s_captureSurface);
 	uint8_t* dst_base = (uint8_t*)s_captureSurface->pixels;
 	int dst_pitch = s_captureSurface->pitch;
 
 	for (int y = 0; y < h; y++) {
-		// GL row 0 is bottom, SDL row 0 is top => flip
-		const uint8_t* src_row = gl_pixels + (size_t)(h - 1 - y) * row_bytes;
 		uint8_t* dst_row = dst_base + (size_t)y * (size_t)dst_pitch;
 
 		for (int x = 0; x < w; x++) {
-			uint8_t r = src_row[x * 4 + 0];
-			uint8_t g = src_row[x * 4 + 1];
-			uint8_t b = src_row[x * 4 + 2];
+			int gx, gy;
+			logical_to_gl_pixel(x, y, &gx, &gy);
+			const uint8_t* src_px = gl_pixels + (size_t)gy * row_bytes + (size_t)gx * 4;
+			uint8_t r = src_px[0];
+			uint8_t g = src_px[1];
+			uint8_t b = src_px[2];
 			// Force alpha to 255 — GL framebuffer alpha is often 0 for opaque
 			// game content, which would make saved screenshots invisible when
 			// loaded and drawn with SDL_BLENDMODE_BLEND
@@ -619,8 +671,8 @@ static void ovl_sdl_end_frame(void) {
 		s_renderSurface->pitch);
 	SDL_UnlockSurface(s_renderSurface);
 
-	// Set overlay GL state
-	glViewport(0, 0, s_screenW, s_screenH);
+	// Set overlay GL state (the whole physical surface)
+	glViewport(0, 0, phys_w(), phys_h());
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_SCISSOR_TEST);
@@ -634,34 +686,18 @@ static void ovl_sdl_end_frame(void) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, s_screenW, s_screenH, 0,
 				 GL_RGBA, GL_UNSIGNED_BYTE, s_uploadBuffer);
 
-	// Draw fullscreen quad (surface is top-down, GL is bottom-up => flip V)
-	float verts[] = {
-		// pos.x, pos.y, u, v
-		-1.0f,
-		-1.0f,
-		0.0f,
-		1.0f,
-		1.0f,
-		-1.0f,
-		1.0f,
-		1.0f,
-		-1.0f,
-		1.0f,
-		0.0f,
-		0.0f,
-		1.0f,
-		-1.0f,
-		1.0f,
-		1.0f,
-		1.0f,
-		1.0f,
-		1.0f,
-		0.0f,
-		-1.0f,
-		1.0f,
-		0.0f,
-		0.0f,
-	};
+	// Draw a fullscreen quad. Texture coordinates come from the physical corner
+	// positions, so the (top-down) logical surface lands flipped for GL and
+	// turned for a rotated display.
+	static const float corners[6][2] = {
+		{-1.0f, -1.0f}, {1.0f, -1.0f}, {-1.0f, 1.0f},
+		{1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f}};
+	float verts[6 * 4];
+	for (int i = 0; i < 6; i++) {
+		verts[i * 4 + 0] = corners[i][0];
+		verts[i * 4 + 1] = corners[i][1];
+		ndc_to_logical_uv(corners[i][0], corners[i][1], &verts[i * 4 + 2], &verts[i * 4 + 3]);
+	}
 
 	glUseProgram(s_texProgram);
 	glUniform1i(s_texLocTexture, 0);

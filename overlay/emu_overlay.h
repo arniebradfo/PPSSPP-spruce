@@ -21,7 +21,8 @@ typedef enum {
 	EMU_OVL_ACTION_CONTINUE,
 	EMU_OVL_ACTION_SAVE_STATE,
 	EMU_OVL_ACTION_LOAD_STATE,
-	EMU_OVL_ACTION_QUIT
+	EMU_OVL_ACTION_QUIT,
+	EMU_OVL_ACTION_HOST_MENU // close and open the emulator's own menu
 } EmuOvlAction;
 
 typedef struct {
@@ -41,7 +42,8 @@ typedef enum {
 	EMU_OVL_MAIN_SAVE,
 	EMU_OVL_MAIN_LOAD,
 	EMU_OVL_MAIN_OPTIONS,
-	EMU_OVL_MAIN_QUIT
+	EMU_OVL_MAIN_QUIT,
+	EMU_OVL_MAIN_HOST_MENU
 } EmuOvlMainItemType;
 
 typedef struct {

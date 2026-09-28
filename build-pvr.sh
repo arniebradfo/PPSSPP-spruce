@@ -45,6 +45,11 @@ done
 python3 /patches/a30/display-rotation.py && echo "Applied: display-rotation.py (from a30)"
 python3 /patches/zero28/rotated-backbuffer-rects.py && echo "Applied: rotated-backbuffer-rects.py"
 
+# MinUI-style in-game menu (overlay/, from nx-redux). Inert unless a launcher
+# sets EMU_OVERLAY_JSON.
+cp /overlay/SDLOverlay.cpp /overlay/SDLOverlay.h SDL/
+python3 /patches/zero28/emu-overlay.py && echo "Applied: emu-overlay.py"
+
 mkdir -p build && cd build
 
 # Cross-compilation environment
@@ -80,7 +85,9 @@ cmake .. \
     -DCMAKE_DISABLE_FIND_PACKAGE_X11=ON \
     -DARM=ON \
     -DARM64=ON \
-    -DMOBILE_DEVICE=OFF
+    -DMOBILE_DEVICE=OFF \
+    -DEMU_OVERLAY=ON \
+    -DEMU_OVERLAY_DIR=/overlay
 
 # Fix cross-compile: -isystem paths get sysroot-prepended by GCC, breaking includes
 find . \( -name 'flags.make' -o -name 'build.ninja' \) -exec sed -i 's|-isystem |-I|g' {} +
