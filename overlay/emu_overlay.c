@@ -231,18 +231,27 @@ int emu_ovl_init(EmuOvl* ovl, EmuOvlConfig* cfg, EmuOvlRenderBackend* render,
 	if (game_name)
 		snprintf(ovl->game_name, sizeof(ovl->game_name), "%s", game_name);
 
-	// Scale factor: match NextUI's FIXED_SCALE
-	// Brick (1024x768) = 3x, Smart Pro / TG5050 (1280x720) = 2x
-	if (screen_w <= 1024)
+	// Scale factor: match NextUI's FIXED_SCALE, and emu_overlay_sdl.c's font
+	// sizes. Only the Brick's 1024x768 display uses 3x; the Smart Pro, TG5050
+	// and 640x480 devices use 2x.
+	if (screen_w == 1024 && screen_h == 768)
 		ovl_scale = 3;
 	else
 		ovl_scale = 2;
 
-	// Items per page: Brick = 5, Smart Pro / TG5050 = 9
-	if (screen_w <= 1024)
+	// Items per page: Brick = 5, Smart Pro / TG5050 = 8. Other screens get as
+	// many rows as fit between the title and hint bars (6 at 640x480, enough
+	// for every main menu entry, since the main menu doesn't scroll).
+	if (screen_w == 1024 && screen_h == 768)
 		ovl->items_per_page = 5;
-	else
+	else if (screen_w >= 1280)
 		ovl->items_per_page = 8;
+	else {
+		int bar_h = S(BUTTON_SIZE) + S(BUTTON_MARGIN) * 2;
+		ovl->items_per_page = (screen_h - bar_h * 2) / S(PILL_SIZE);
+		if (ovl->items_per_page < 1)
+			ovl->items_per_page = 1;
+	}
 
 	build_main_menu(ovl);
 
