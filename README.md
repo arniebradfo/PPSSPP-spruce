@@ -44,6 +44,13 @@ The MagicX Mini Zero 28 has the Brick/TSP's A133P and GE8300, and its MOSS firmw
 
 This Zero 28 work was written by Claude (Anthropic's Claude Opus 5.5) in Claude Code, and tested on a Zero 28 by [arniebradfo](https://github.com/arniebradfo). It builds on the Miyoo A30 rotation patch already here, on nx-redux's overlay, and on [ben16w/minui-psp](https://github.com/ben16w/minui-psp).
 
+Related pull requests (each links the others, so this code stays findable whichever is merged or declined):
+
+- [ben16w/minui-psp#88](https://github.com/ben16w/minui-psp/pull/88): Zero 28 support in the MinUI PSP pak
+- [ben16w/PPSSPP-spruce#3](https://github.com/ben16w/PPSSPP-spruce/pull/3): display rotation and the in-game menu in the PowerVR build
+- [spruceUI/PPSSPP-spruce#5](https://github.com/spruceUI/PPSSPP-spruce/pull/5): only the rotation fix
+- [ryanmsartor/Mini-Zero-28-Custom-MinUI-Paks#4](https://github.com/ryanmsartor/Mini-Zero-28-Custom-MinUI-Paks/pull/4): a ready-built PSP.pak for the Zero 28, built from these
+
 ### Assets path
 
 Assets (fonts, UI images, flash0 firmware files) are found **relative to the binary** at `<binary_dir>/assets/`. This is not patched — it uses PPSSPP's built-in exe-relative discovery via `/proc/self/exe`. No changes needed as long as the `assets/` folder sits next to the binary.
